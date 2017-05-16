@@ -6,14 +6,15 @@
 
 #include "command.h"
 #include "hash.h"
+#include "s2c.h"
 #include "util.h"
 
 /* Public key generation */
-void pk_usage(const char *name) {
+static void pk_usage(const char *name) {
     fprintf(stderr, "  %s publickey <hex-encoded secret key>\n", name);
 }
 
-int pk_command(int argc, char *argv[]) {
+static int pk_command(int argc, char *argv[]) {
     unsigned char sk[32];
     secp256k1_pubkey pk;
     secp256k1_context *ctx;
@@ -47,11 +48,11 @@ int pk_command(int argc, char *argv[]) {
 }
 
 /* Signing */
-void sign_usage(const char *name) {
+static void sign_usage(const char *name) {
     fprintf(stderr, "  %s sign <secret key> <message>\n", name);
 }
 
-int sign_command(int argc, char *argv[]) {
+static int sign_command(int argc, char *argv[]) {
     secp256k1_context *ctx;
     secp256k1_ecdsa_signature sig;
     unsigned char msg[32];
@@ -99,11 +100,11 @@ int sign_command(int argc, char *argv[]) {
 }
 
 /* Verification */
-void verify_usage(const char *name) {
+static void verify_usage(const char *name) {
     fprintf(stderr, "  %s verify <public key> <signature> <message>\n", name);
 }
 
-int verify_command(int argc, char *argv[]) {
+static int verify_command(int argc, char *argv[]) {
     unsigned char msg[32];
     unsigned char pkbin[33];
     unsigned char sigbin[72];
@@ -169,6 +170,7 @@ int verify_command(int argc, char *argv[]) {
 cli_command COMMANDS[] = {
     { "publickey", 3, pk_usage, pk_command },
     { "sign", 4, sign_usage, sign_command },
+    { "signtocontract", 5, s2c_usage, s2c_command },
     { "verify", 5, verify_usage, verify_command }
 };
 const size_t NCOMMANDS = sizeof(COMMANDS) / sizeof(COMMANDS[0]);
