@@ -23,8 +23,9 @@ static int nonce_function_s2c_(unsigned char *nonce32, const unsigned char *msg3
         return 0;
     }
 
-    /* Compute public nonce -- note that the calling function will do this again, which is
-     * a known inefficiency in the libsecp API, but for this app it's acceptable. */
+    /* Compute public nonce -- the calling code will also compute a public nonce, but a
+     * tweaked one, and we need this one to compute the tweak, so the inefficiency here
+     * is inherent to the problem. */
     if (secp256k1_ec_pubkey_create(s2c_ctx->ctx, &s2c_ctx->pk_ret, nonce32) == 0) {
         return 0;
     }
