@@ -6,7 +6,7 @@ SOURCES=src/main.c src/command.c src/hash.c src/s2c.c src/util.c
 
 
 all: $(SOURCES)
-	gcc $(CFLAGS) $(LFLAGS) $(SOURCES) -o sighacker
+	gcc $(CFLAGS) $(SOURCES) $(LFLAGS) -o sighacker
 
 check: all
 	./tests.sh
