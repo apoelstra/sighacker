@@ -1,5 +1,6 @@
 
 #include <secp256k1.h>
+#include <secp256k1_recovery.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -167,8 +168,89 @@ static int verify_command(int argc, char *argv[]) {
     }
 }
 
+/* Pubkey recovery */
+static void recoverpk_usage(const char *name) {
+    fprintf(stderr, "  %s recoverpubkey <signature> <message>\n", name);
+}
+
+static int recoverpk_command(int argc, char *argv[]) {
+    unsigned char msg[32];
+    unsigned char sigbin[72];
+    unsigned char compact_sig[64];
+    unsigned char pkbin[33];
+    size_t publen = 33;
+    secp256k1_pubkey pk;
+    secp256k1_ecdsa_signature sig;
+    secp256k1_ecdsa_recoverable_signature recsig;
+    size_t siglen;
+    secp256k1_context *ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY);
+    int recid;
+    int recovered = 0;
+
+    (void) argc;
+
+    /* Parse signature */
+    if (strlen(argv[2]) > 2 * sizeof(sigbin)) {
+        fprintf(stderr, "signature « %s » exceeds maximum length\n", argv[2]);
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+    siglen = hex2bin(argv[2], sigbin);
+    if (siglen == 0) {
+        fprintf(stderr, "signature « %s » should be a hex string\n", argv[2]);
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+    if (!secp256k1_ecdsa_signature_parse_der(ctx, &sig, sigbin, siglen)) {
+        fprintf(stderr, "signature « %s » should be a DER-encoded hex string\n", argv[2]);
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+    if (!secp256k1_ecdsa_signature_serialize_compact(ctx, compact_sig, &sig)) {
+        fprintf(stderr, "signature could not be re-encoded as comapct\n");
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+
+    /* Parse message */
+    if (strlen(argv[3]) == 64 && hex2bin(argv[3], msg)) {
+        fprintf(stderr, "Note: message appears to be a 32-byte hex string, interpreting as hex rather than re-hashing.\n");
+    } else {
+        secp256k1_sha256_t sha2;
+        secp256k1_sha256_initialize(&sha2);
+        secp256k1_sha256_write(&sha2, (unsigned char*)argv[3], strlen(argv[3]));
+        secp256k1_sha256_finalize(&sha2, msg);
+    }
+
+    /* Recover */
+    /* Try all recids */
+    for (recid = 0; recid < 4; ++recid) {
+        if (!secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &recsig, compact_sig, recid)) {
+            fprintf(stderr, "Unable to parse compact signature with recid %d\n", recid);
+            secp256k1_context_destroy(ctx);
+            return 0;
+        }
+        if (secp256k1_ecdsa_recover(ctx, &pk, &recsig, msg)) {
+            secp256k1_ec_pubkey_serialize(ctx, pkbin, &publen, &pk, SECP256K1_EC_COMPRESSED);
+            char pubhex[131];
+            bin2hex(pubhex, pkbin, publen);
+            printf("recid: %d, pubkey: %s\n", recid, pubhex);
+            recovered = 1;
+        }
+    }
+    if (recovered) {
+        secp256k1_context_destroy(ctx);
+        return 1;
+    } else {
+        puts("Unable to recover pubkey from signature.");
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+}
+
 cli_command COMMANDS[] = {
     { "publickey", 3, pk_usage, pk_command },
+    { "recoverpubkey", 4, recoverpk_usage, recoverpk_command },
     { "sign", 4, sign_usage, sign_command },
     { "signtocontract", 5, s2c_usage, s2c_command },
     { "verify", 5, verify_usage, verify_command }
